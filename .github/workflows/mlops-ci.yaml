@@ -1,17 +1,9 @@
-# .github/workflows/mlops-ci.yaml
-# ─────────────────────────────────────────────────────────────────────
-# MLOps CI/CD Workflow for the Daily Sales Analytics Pipeline
-# Addresses two incidents:
-#   1. Schema change broke the nightly batch job
-#   2. Unreviewed deployment promoted a bad artifact to staging
-# ─────────────────────────────────────────────────────────────────────
-
 name: MLOps CI Pipeline
 
 on:
-  # TRIGGER 1 — Pull Request to main
-  # Runs only when pipeline logic, assets, or config files change.
-  # Avoids wasting CI minutes on unrelated changes like README edits.
+  # TRIGGER 1: Runs on pull requests to main only when pipeline,
+  # assets, or config files change — avoids wasting CI minutes
+  # on unrelated changes like README edits.
   pull_request:
     branches:
       - main
@@ -20,15 +12,127 @@ on:
       - "assets/**"
       - "config/**"
 
-  # TRIGGER 2 — Nightly scheduled run at 2:00 AM UTC
-  # Catches data/schema issues that appear even without a code push,
-  # for example when upstream data changes overnight.
+  # TRIGGER 2: Nightly run at 2:00 AM UTC.
+  # Catches data or schema issues that appear even without
+  # a code push, for example when upstream data changes overnight.
   schedule:
     - cron: "0 2 * * *"
 
-  # TRIGGER 3 — Manual trigger from the GitHub UI
-  # Allows on-demand reruns after an incident or hotfix
+  # TRIGGER 3: Manual trigger from the GitHub UI.
+  # Useful for on-demand reruns after an incident or hotfix
   # without needing to push a dummy commit.
   workflow_dispatch:
 
-# ─────────────────────────────────
+# GUARDRAIL: Prevents two runs of the same workflow on the same
+# branch from overlapping. Without this, a slow nightly run and
+# a manual trigger could race and produce conflicting artifacts.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  static_checks:
+    name: Static Code Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install linting tools
+        run: pip install flake8 black
+
+      - name: Run flake8 syntax and style linting
+        run: flake8 pipeline/ definitions.py --max-line-length=100 --ignore=E302,W503
+
+      - name: Run black formatting check
+        run: black --check pipeline/ definitions.py
+
+  test_and_validate:
+    name: Tests, Schema Validation and Smoke Test
+    runs-on: ubuntu-latest
+    needs: static_checks
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install dagster pandas pytest
+
+      - name: Schema validation
+        run: |
+          python - <<'EOF'
+          import pandas as pd
+          import sys
+          REQUIRED_COLUMNS = {"order_id", "customer_id", "region", "quantity", "unit_price"}
+          df = pd.read_csv("sales_data.csv")
+          missing = REQUIRED_COLUMNS - set(df.columns)
+          if missing:
+              print(f"SCHEMA VALIDATION FAILED. Missing columns: {missing}")
+              sys.exit(1)
+          else:
+              print(f"Schema validation passed. Columns found: {list(df.columns)}")
+          EOF
+
+      - name: Smoke test
+        run: |
+          python -c "
+          from definitions import defs
+          assets = defs.get_all_asset_defs()
+          print(f'Smoke test passed. {len(assets)} assets loaded successfully.')
+          "
+
+  package_artifact:
+    name: Package Pipeline Artifact
+    runs-on: ubuntu-latest
+    needs: test_and_validate
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create pipeline zip package
+        run: zip -r pipeline-artifact.zip pipeline/ definitions.py sales_data.csv
+
+      - name: Upload artifact to GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: sales-pipeline-artifact
+          path: pipeline-artifact.zip
+          retention-days: 7
+
+  deploy_staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: package_artifact
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: staging
+    steps:
+      - name: Download pipeline artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sales-pipeline-artifact
+
+      - name: Placeholder deploy step
+        run: |
+          echo "Deploying sales-pipeline-artifact.zip to staging..."
+          echo "Deployment simulation complete."
+
+      - name: Post-deployment smoke test
+        run: |
+          pip install dagster pandas
+          unzip pipeline-artifact.zip
+          python -c "
+          from definitions import defs
+          assets = defs.get_all_asset_defs()
+          print(f'Post-deploy smoke test passed. {len(assets)} assets verified in staging.')
+          "
