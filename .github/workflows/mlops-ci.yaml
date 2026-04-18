@@ -1,0 +1,34 @@
+# .github/workflows/mlops-ci.yaml
+# ─────────────────────────────────────────────────────────────────────
+# MLOps CI/CD Workflow for the Daily Sales Analytics Pipeline
+# Addresses two incidents:
+#   1. Schema change broke the nightly batch job
+#   2. Unreviewed deployment promoted a bad artifact to staging
+# ─────────────────────────────────────────────────────────────────────
+
+name: MLOps CI Pipeline
+
+on:
+  # TRIGGER 1 — Pull Request to main
+  # Runs only when pipeline logic, assets, or config files change.
+  # Avoids wasting CI minutes on unrelated changes like README edits.
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "pipelines/**"
+      - "assets/**"
+      - "config/**"
+
+  # TRIGGER 2 — Nightly scheduled run at 2:00 AM UTC
+  # Catches data/schema issues that appear even without a code push,
+  # for example when upstream data changes overnight.
+  schedule:
+    - cron: "0 2 * * *"
+
+  # TRIGGER 3 — Manual trigger from the GitHub UI
+  # Allows on-demand reruns after an incident or hotfix
+  # without needing to push a dummy commit.
+  workflow_dispatch:
+
+# ─────────────────────────────────
