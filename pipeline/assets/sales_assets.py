@@ -5,8 +5,7 @@ from pipeline.resources.sales_io import SalesIOResource
 
 @asset
 def raw_sales(
-    context: AssetExecutionContext,
-    sales_io: SalesIOResource
+    context: AssetExecutionContext, sales_io: SalesIOResource
 ) -> pd.DataFrame:
     """
     Reads raw transactional sales data from a CSV file.
@@ -19,9 +18,7 @@ def raw_sales(
 
 @asset
 def clean_sales(
-    context: AssetExecutionContext,
-    raw_sales: pd.DataFrame,
-    sales_io: SalesIOResource
+    context: AssetExecutionContext, raw_sales: pd.DataFrame, sales_io: SalesIOResource
 ) -> pd.DataFrame:
     """
     Cleans the raw sales data:
@@ -53,18 +50,18 @@ def clean_sales(
 
 @asset
 def sales_by_region(
-    context: AssetExecutionContext,
-    clean_sales: pd.DataFrame
+    context: AssetExecutionContext, clean_sales: pd.DataFrame
 ) -> pd.DataFrame:
     """
     Groups clean sales data by region and computes:
     - total_sales: sum of all sales_amount per region
     - total_orders: count of orders per region
     """
-    df = clean_sales.groupby("region").agg(
-        total_sales=("sales_amount", "sum"),
-        total_orders=("order_id", "count")
-    ).reset_index()
+    df = (
+        clean_sales.groupby("region")
+        .agg(total_sales=("sales_amount", "sum"), total_orders=("order_id", "count"))
+        .reset_index()
+    )
 
     context.log.info(f"Aggregated sales for {len(df)} regions.")
     return df
@@ -74,7 +71,7 @@ def sales_by_region(
 def daily_metrics(
     context: AssetExecutionContext,
     clean_sales: pd.DataFrame,
-    sales_by_region: pd.DataFrame
+    sales_by_region: pd.DataFrame,
 ) -> dict:
     """
     Produces one daily summary dictionary with key KPIs.

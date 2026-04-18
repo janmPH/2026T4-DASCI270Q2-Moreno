@@ -18,7 +18,7 @@ def check_no_nulls_in_clean_sales(clean_sales: pd.DataFrame) -> AssetCheckResult
         metadata={
             "null_counts": str(null_counts.to_dict()),
             "rows_checked": len(clean_sales),
-        }
+        },
     )
 
 
@@ -39,5 +39,5 @@ def check_daily_metrics_business_rules(daily_metrics: dict) -> AssetCheckResult:
             "total_sales": total_sales,
             "total_orders": total_orders,
             "top_region": daily_metrics.get("top_region", "N/A"),
-        }
+        },
     )

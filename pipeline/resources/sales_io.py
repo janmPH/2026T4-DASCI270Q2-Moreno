@@ -8,6 +8,7 @@ class SalesIOResource(ConfigurableResource):
     By making this a resource, we can swap out the file path
     without changing any asset logic — this is dependency injection.
     """
+
     csv_path: str = "sales_data.csv"
 
     def load_raw_data(self) -> pd.DataFrame:

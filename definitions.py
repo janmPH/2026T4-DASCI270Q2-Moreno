@@ -15,10 +15,7 @@ all_assets = load_assets_from_modules([sales_assets])
 all_checks = load_asset_checks_from_modules([sales_checks])
 
 # Define a job that runs all assets
-daily_sales_job = define_asset_job(
-    name="daily_sales_job",
-    selection="*"
-)
+daily_sales_job = define_asset_job(name="daily_sales_job", selection="*")
 
 # I chose a schedule over a sensor because this is a predictable
 # daily pipeline — sensors are better for event-driven triggers
