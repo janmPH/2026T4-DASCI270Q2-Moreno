@@ -67,26 +67,27 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install dagster pandas pytest
+        run: pip install dagster dagster-webserver pandas
 
       - name: Schema validation
         run: |
-          python - <<'EOF'
+          python3 -c "
           import pandas as pd
           import sys
-          REQUIRED_COLUMNS = {"order_id", "customer_id", "region", "quantity", "unit_price"}
-          df = pd.read_csv("sales_data.csv")
+          REQUIRED_COLUMNS = {'order_id', 'customer_id', 'region', 'quantity', 'unit_price'}
+          df = pd.read_csv('sales_data.csv')
           missing = REQUIRED_COLUMNS - set(df.columns)
           if missing:
-              print(f"SCHEMA VALIDATION FAILED. Missing columns: {missing}")
+              print(f'SCHEMA VALIDATION FAILED. Missing: {missing}')
               sys.exit(1)
-          else:
-              print(f"Schema validation passed. Columns found: {list(df.columns)}")
-          EOF
+          print(f'Schema validation passed. Columns: {list(df.columns)}')
+          "
 
       - name: Smoke test
         run: |
-          python -c "
+          python3 -c "
+          import sys
+          sys.path.insert(0, '.')
           from definitions import defs
           assets = defs.get_all_asset_defs()
           print(f'Smoke test passed. {len(assets)} assets loaded successfully.')
@@ -129,10 +130,12 @@ jobs:
 
       - name: Post-deployment smoke test
         run: |
-          pip install dagster pandas
+          pip install dagster dagster-webserver pandas
           unzip pipeline-artifact.zip
-          python -c "
+          python3 -c "
+          import sys
+          sys.path.insert(0, '.')
           from definitions import defs
           assets = defs.get_all_asset_defs()
-          print(f'Post-deploy smoke test passed. {len(assets)} assets verified in staging.')
+          print(f'Post-deploy smoke test passed. {len(assets)} assets verified.')
           "
